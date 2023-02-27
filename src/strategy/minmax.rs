@@ -23,6 +23,19 @@ impl fmt::Display for MinMax {
 /// Any time algorithms will compute until a deadline is hit and the process is killed.
 /// They are therefore run in another process and communicate through shared memory.
 /// This function is intended to be called from blobwar_iterative_deepening.
+/// 
+///function minimax(node, depth, maximizingPlayer) is
+///    if depth = 0 or node is a terminal node then <br>
+///    return the heuristic value of node <br>
+///if maximizingPlayer then <br>
+///    value := −∞ <br>
+///    for each child of node do <br>
+///        value := max(value, minimax(child, depth − 1, FALSE)) <br>
+///else (* minimizing player *) <br>
+///    value := +∞ <br>
+///    for each child of node do <br>
+///        value := min(value, minimax(child, depth − 1, TRUE)) <br>
+///return value <br>
 pub fn min_max_anytime(state: &Configuration) {
     let mut movement = AtomicMove::connect().expect("failed connecting to shmem");
     for depth in 1..100 {
