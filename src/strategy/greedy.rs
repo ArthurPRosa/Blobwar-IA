@@ -1,4 +1,6 @@
 //! Dumb greedy algorithm.
+use itertools::Itertools;
+
 use super::Strategy;
 use crate::configuration::{Configuration, Movement};
 use std::fmt;
@@ -16,6 +18,10 @@ impl fmt::Display for Greedy {
 
 impl Strategy for Greedy {
     fn compute_next_move(&mut self, state: &Configuration) -> Option<Movement> {
-        unimplemented!("TODO: algo glouton")
+        state
+            .movements()
+            .filter(|mov| state.check_move(mov))
+            .sorted_by_key(|mov| -state.clone().play(mov).value())
+            .next()
     }
 }
