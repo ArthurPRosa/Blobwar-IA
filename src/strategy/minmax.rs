@@ -1,6 +1,6 @@
 //! Implementation of the min max algorithm.
 use itertools::Itertools;
-use rayon::prelude::{ParallelIterator, IntoParallelIterator};
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 use super::Strategy;
 use crate::configuration::{Configuration, Movement};
@@ -11,6 +11,10 @@ use std::fmt;
 pub struct MinMax(pub u8);
 
 fn min_max_rec(state: &Configuration, depth: u8) -> Option<(i8, Option<Movement>)> {
+    if depth == 0 {
+        return Some((state.value(), None));
+    }
+
     let ok_moves = state.par_movements().filter(|mov| state.check_move(mov));
 
     // If no move is doable, return the value (right now the game can't end)
