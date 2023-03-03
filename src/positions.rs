@@ -5,6 +5,9 @@ use std::fmt;
 use std::iter::repeat;
 use std::ops::Deref;
 
+use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, UnindexedConsumer};
+use rayon::prelude::{IndexedParallelIterator, ParallelIterator};
+
 /// Coordinate of a board cell (between 0 and 64).
 pub type Position = u8;
 
@@ -52,7 +55,7 @@ impl Positions {
     /// Iterate on bits from lowest to highest.
     /// Will stop as soon as all remaining bits are set to 0.
     pub fn bits(&self) -> BitIterator {
-        BitIterator { remaining: self.0 }
+        BitIterator::new(self.0)
     }
     /// Iterate on all our 64 bits.
     pub fn full_bits(&self) -> impl Iterator<Item = bool> {
@@ -113,11 +116,35 @@ impl Default for Positions {
 
 pub struct BitIterator {
     remaining: u64,
+    last_index: u8,
+}
+
+impl BitIterator {
+    fn new(remaining: u64) -> BitIterator {
+        BitIterator {
+            remaining: remaining,
+            last_index: 64,
+        }
+    }
 }
 
 impl Iterator for BitIterator {
     type Item = bool;
     fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            None
+        } else {
+            let bit = self.remaining & 1;
+            self.remaining >>= 1;
+            Some(bit == 1)
+        }
+    }
+}
+
+impl ExactSizeIterator for BitIterator {}
+
+impl DoubleEndedIterator for BitIterator {
+    fn next_back(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
             None
         } else {
@@ -140,5 +167,68 @@ impl fmt::Display for Positions {
         }
         write!(f, "]")?;
         Ok(())
+    }
+}
+
+struct ParallelBitIterator {
+    remaining:u64,
+    start:u8,
+    end:u8
+}
+
+impl ParallelIterator for ParallelBitIterator {
+    type Item = bool;
+
+    fn drive_unindexed<C>(self, consumer: C) -> C::Result
+    where
+        C: UnindexedConsumer<Self::Item>,
+    {
+        bridge(self, consumer)
+    }
+
+    fn opt_len(&self) -> Option<usize> {
+        Some(self.len())
+    }
+}
+
+impl IndexedParallelIterator for ParallelBitIterator {
+    fn with_producer<CB: ProducerCallback<Self::Item>>(self, callback: CB) -> CB::Output {
+        todo!()
+    }
+
+    fn drive<C: Consumer<Self::Item>>(self, consumer: C) -> C::Result {
+        bridge(self, consumer)
+    }
+
+    fn len(&self) -> usize {
+        64
+    }
+}
+
+impl Producer for ParallelBitIterator {
+    type Item = bool;
+    type IntoIter = BitIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BitIterator::new(self.remaining)
+    }
+
+    fn split_at(self, index: usize) -> (Self, Self) {
+        (ParallelBitIterator{remaining:self.remaining, start:self.start, end:index as u8}, ParallelBitIterator{remaining:self.remaining, start:self.start, end:index as u8})
+    }
+
+    fn min_len(&self) -> usize {
+        64
+    }
+
+    fn max_len(&self) -> usize {
+        64
+    }
+
+    fn fold_with<F>(self, folder: F) -> F
+    where
+        F: rayon::iter::plumbing::Folder<Self::Item>,
+    {
+        folder.consume_iter(self.into_iter())
     }
 }

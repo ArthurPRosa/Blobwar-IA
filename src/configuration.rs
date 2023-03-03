@@ -2,6 +2,7 @@
 use super::board::Board;
 use super::positions::{BoardPosition, Position, Positions};
 use super::strategy::Strategy;
+use rayon::prelude::{ParallelIterator, ParallelBridge};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::once;
@@ -84,6 +85,11 @@ impl<'a> Configuration<'a> {
             .union_with(self.board.holes)
             .invert()
             .positions()
+    }
+
+    /// Same as empty_cells but parallel
+    pub fn par_empty_cells(&self) -> impl ParallelIterator<Item = Position> {
+        self.empty_cells().par_bridge()
     }
 
     /// Return the configuration value (#other_player - #current_player)
@@ -190,6 +196,11 @@ impl<'a> Configuration<'a> {
     /// Iterate on all possible moves.
     pub fn movements<'b>(&'b self) -> impl 'b + Iterator<Item = Movement> {
         self.duplicates().chain(self.jumps())
+    }
+
+    /// Iterate on all possible moves with parellelism
+    pub fn par_movements<'b>(&'b self) -> impl 'b + ParallelIterator<Item = Movement> {
+        self.duplicates().chain(self.jumps()).par_bridge()
     }
 
     /// Serialize `Configuration` into a `String`.
