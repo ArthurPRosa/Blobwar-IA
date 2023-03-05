@@ -16,6 +16,11 @@ serde_derive="*"
 serde="*"
 serde_json="*"
 rayon = "1.6.1"
+bencher = "0.1.5"
 
 [target.'cfg(unix)'.dependencies]
 nix="0.6"
+
+[[bench]]
+name = "versus_testing"
+harness = false
