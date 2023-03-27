@@ -57,6 +57,15 @@ impl Positions {
     pub fn bits(&self) -> BitIterator {
         BitIterator::new(self.0)
     }
+
+    pub fn par_bits(&self) -> ParallelBitIterator {
+        ParallelBitIterator {
+            board: self.0,
+            start: 0,
+            end: 64,
+        }
+    }
+
     /// Iterate on all our 64 bits.
     pub fn full_bits(&self) -> impl Iterator<Item = bool> {
         self.bits().chain(repeat(false)).take(64)
@@ -70,6 +79,13 @@ impl Positions {
     /// Iterate on all `Position` inside us.
     pub fn positions(&self) -> impl Iterator<Item = Position> {
         self.bits()
+            .enumerate()
+            .filter(|&(_, bit)| bit)
+            .map(|(position, _)| position as Position)
+    }
+
+    pub fn par_positions(&self) -> impl ParallelIterator<Item = Position> {
+        self.par_bits()
             .enumerate()
             .filter(|&(_, bit)| bit)
             .map(|(position, _)| position as Position)
@@ -117,6 +133,7 @@ impl Default for Positions {
 pub struct BitIterator {
     remaining: u64,
     last_index: u8,
+    size: Option<u8>,
 }
 
 impl BitIterator {
@@ -124,19 +141,42 @@ impl BitIterator {
         BitIterator {
             remaining: remaining,
             last_index: 64,
+            size: None,
         }
+    }
+
+    fn start_at(&mut self, n: u8) {
+        self.remaining >>= n;
+    }
+
+    fn end_at(&mut self, n: u8) {
+        self.last_index = n;
     }
 }
 
 impl Iterator for BitIterator {
     type Item = bool;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining == 0 {
+        if self.last_index == 0 || self.remaining == 0 {
             None
         } else {
             let bit = self.remaining & 1;
             self.remaining >>= 1;
             Some(bit == 1)
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if let Some(l) = self.size {
+            (l as usize, Some(l as usize))
+        } else {
+            let mut l = 0;
+            for i in 0..64 {
+                if (self.remaining >> i) & 1 != 0 {
+                    l += 1
+                }
+            }
+            (l as usize, Some(l as usize))
         }
     }
 }
@@ -145,7 +185,7 @@ impl ExactSizeIterator for BitIterator {}
 
 impl DoubleEndedIterator for BitIterator {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.remaining == 0 {
+        if self.last_index == 0 || self.remaining == 0 {
             None
         } else {
             let bit = self.remaining & 1;
@@ -170,10 +210,12 @@ impl fmt::Display for Positions {
     }
 }
 
-struct ParallelBitIterator {
-    remaining:u64,
-    start:u8,
-    end:u8
+//Made mostly with the help of https://geo-ant.github.io/blog/2022/implementing-parallel-iterators-rayon/
+
+pub struct ParallelBitIterator {
+    board: u64,
+    start: u8,
+    end: u8,
 }
 
 impl ParallelIterator for ParallelBitIterator {
@@ -193,7 +235,12 @@ impl ParallelIterator for ParallelBitIterator {
 
 impl IndexedParallelIterator for ParallelBitIterator {
     fn with_producer<CB: ProducerCallback<Self::Item>>(self, callback: CB) -> CB::Output {
-        todo!()
+        let producer = BitProducer {
+            board: self.board,
+            start: self.start,
+            end: self.end,
+        };
+        callback.callback(producer)
     }
 
     fn drive<C: Consumer<Self::Item>>(self, consumer: C) -> C::Result {
@@ -201,28 +248,40 @@ impl IndexedParallelIterator for ParallelBitIterator {
     }
 
     fn len(&self) -> usize {
-        64
+        (self.end - self.start) as usize
     }
 }
 
-impl Producer for ParallelBitIterator {
+struct BitProducer {
+    board: u64,
+    start: u8,
+    end: u8,
+}
+
+impl Producer for BitProducer {
     type Item = bool;
     type IntoIter = BitIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        BitIterator::new(self.remaining)
+        let mut res = BitIterator::new(self.board);
+        res.start_at(self.start);
+        res.end_at(self.end);
+        res
     }
 
     fn split_at(self, index: usize) -> (Self, Self) {
-        (ParallelBitIterator{remaining:self.remaining, start:self.start, end:index as u8}, ParallelBitIterator{remaining:self.remaining, start:self.start, end:index as u8})
-    }
-
-    fn min_len(&self) -> usize {
-        64
-    }
-
-    fn max_len(&self) -> usize {
-        64
+        (
+            BitProducer {
+                board: self.board,
+                start: self.start,
+                end: index as u8,
+            },
+            BitProducer {
+                board: self.board,
+                start: self.start,
+                end: index as u8,
+            },
+        )
     }
 
     fn fold_with<F>(self, folder: F) -> F

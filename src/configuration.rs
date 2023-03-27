@@ -2,7 +2,7 @@
 use super::board::Board;
 use super::positions::{BoardPosition, Position, Positions};
 use super::strategy::Strategy;
-use rayon::prelude::{ParallelIterator, ParallelBridge};
+use rayon::prelude::{ParallelBridge, ParallelIterator};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::once;
@@ -89,7 +89,11 @@ impl<'a> Configuration<'a> {
 
     /// Same as empty_cells but parallel
     pub fn par_empty_cells(&self) -> impl ParallelIterator<Item = Position> {
-        self.empty_cells().par_bridge()
+        self.blobs[0]
+            .union_with(self.blobs[1])
+            .union_with(self.board.holes)
+            .invert()
+            .par_positions()
     }
 
     /// Return the configuration value (#other_player - #current_player)
@@ -182,9 +186,32 @@ impl<'a> Configuration<'a> {
             })
     }
 
+    fn par_jumps<'b>(&'b self) -> impl 'b + ParallelIterator<Item = Movement> {
+        self.blobs[self.current_player as usize]
+            .par_positions()
+            .flat_map(move |start| {
+                // look at all distance 2 neighbours
+                self.board.individual_neighbours[1][start as usize]
+                    .iter()
+                    .filter(move |&end| self.free_position_at(*end))
+                    .map(move |end| Movement::Jump(start, *end))
+                    .par_bridge()
+            })
+    }
+
     /// Iterate on all possible duplications for given player.
     fn duplicates<'b>(&'b self) -> impl 'b + Iterator<Item = Movement> {
         self.empty_cells()
+            .filter(move |&p| {
+                !self.blobs[self.current_player as usize]
+                    .intersection_with(self.board.neighbours[p as usize])
+                    .is_empty()
+            })
+            .map(Movement::Duplicate)
+    }
+
+    fn par_duplicates<'b>(&'b self) -> impl 'b + ParallelIterator<Item = Movement> {
+        self.par_empty_cells()
             .filter(move |&p| {
                 !self.blobs[self.current_player as usize]
                     .intersection_with(self.board.neighbours[p as usize])
@@ -200,7 +227,8 @@ impl<'a> Configuration<'a> {
 
     /// Iterate on all possible moves with parellelism
     pub fn par_movements<'b>(&'b self) -> impl 'b + ParallelIterator<Item = Movement> {
-        self.duplicates().chain(self.jumps()).par_bridge()
+        //self.par_duplicates().chain(self.par_jumps())
+        self.movements().par_bridge()
     }
 
     /// Serialize `Configuration` into a `String`.
