@@ -5,6 +5,7 @@ use super::strategy::Strategy;
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
+use std::hash::Hash;
 use std::iter::once;
 use term;
 
@@ -320,5 +321,23 @@ impl<'a> fmt::Display for Configuration<'a> {
         }
         write!(f, " +--------+")?;
         Ok(())
+    }
+}
+
+impl PartialEq for Configuration<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.blobs
+            .get(0)
+            .unwrap()
+            .intersection_with(*other.blobs.get(0).unwrap())
+            .is_empty()
+    }
+}
+
+impl Eq for Configuration<'_> {}
+
+impl std::hash::Hash for Configuration<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.board.holes.0.hash(state);
     }
 }

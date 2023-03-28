@@ -17,6 +17,7 @@ serde="*"
 serde_json="*"
 rayon = "1.6.1"
 bencher = "0.1.5"
+memoize = "0.4.0"
 
 [target.'cfg(unix)'.dependencies]
 nix="0.6"
