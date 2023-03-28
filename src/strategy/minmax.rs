@@ -9,41 +9,70 @@ use std::fmt;
 /// Min-Max algorithm with a given recursion depth.
 pub struct MinMax(pub u8);
 
-fn min_max_rec(player: bool, state: &Configuration, depth: u8) -> Option<(i8, Option<Movement>)> {
+/// .
+///
+/// # Panics
+///
+/// Panics if .
+pub fn min_max_rec(
+    player: bool,
+    state: &Configuration,
+    depth: u8,
+) -> Option<(i8, Option<Movement>)> {
     if depth == 0 {
-        return Some((state.value(), None));
+        return Some((
+            state.value()
+                * if state.current_player == player {
+                    1
+                } else {
+                    -1
+                },
+            None,
+        ));
     }
 
     let ok_moves = state.movements().filter(|mov| state.check_move(mov));
 
     let mut check_moves_size = ok_moves.peekable();
 
-    // If no move is doable, return the value (right now the game can't end)
+    // If no move is doable, return the value
     if check_moves_size.peek() == None {
-        return Some((state.value(), None));
+        return Some((
+            state.value()
+                * if state.current_player == player {
+                    1
+                } else {
+                    -1
+                },
+            None,
+        ));
     }
 
-
     if depth > 1 {
-        let nodes = check_moves_size
-            .par_bridge()
-            .filter_map(|mov| Some((min_max_rec(player, &state.play(&mov), depth - 1)?.0, Some(mov))));
-        if state.current_player == player{
+        let nodes = check_moves_size.par_bridge().filter_map(|mov| {
+            Some((
+                min_max_rec(player, &state.play(&mov), depth - 1)?.0,
+                Some(mov),
+            ))
+        });
+        if state.current_player == player {
             nodes.min_by_key(|a: &(i8, Option<Movement>)| a.0)
         } else {
             nodes.max_by_key(|a: &(i8, Option<Movement>)| a.0)
         }
     } else {
-        let nodes = check_moves_size
-            .filter_map(|mov| Some((min_max_rec(player, &state.play(&mov), depth - 1)?.0, Some(mov))));
+        let nodes = check_moves_size.filter_map(|mov| {
+            Some((
+                min_max_rec(player, &state.play(&mov), depth - 1)?.0,
+                Some(mov),
+            ))
+        });
         if state.current_player == player {
             nodes.min_by_key(|a: &(i8, Option<Movement>)| a.0)
         } else {
             nodes.max_by_key(|a: &(i8, Option<Movement>)| a.0)
         }
     }
-
-    
 }
 
 impl Strategy for MinMax {

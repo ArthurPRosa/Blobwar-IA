@@ -21,7 +21,6 @@ impl Strategy for Greedy {
         state
             .movements()
             .filter(|mov| state.check_move(mov))
-            .sorted_by_key(|mov| -state.clone().play(mov).value())
-            .next()
+            .min_by_key(|mov| -state.play(mov).value())
     }
 }
