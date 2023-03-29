@@ -97,7 +97,9 @@ impl fmt::Display for MinMax {
 /// This function is intended to be called from blobwar_iterative_deepening.
 pub fn min_max_anytime(state: &Configuration) {
     let mut movement = AtomicMove::connect().expect("failed connecting to shmem");
-    for depth in 1..100 {
-        movement.store(MinMax(depth).compute_next_move(state));
-    }
+    // for depth in 1..100 {
+    //     movement.store(MinMax(depth).compute_next_move(state));
+    // }
+    
+    movement.store(MinMax(4).compute_next_move(&state));
 }
