@@ -1,33 +1,39 @@
 //! Alpha - Beta algorithm.
 use std::fmt;
+use std::u128::MAX;
+use std::u32::MIN;
 
 use super::Strategy;
 use crate::configuration::{Configuration, Movement};
 use crate::shmem::AtomicMove;
 
-fn alpha_beta_rec(
-    player: bool,
-    state: &Configuration,
-    depth: u8,
-    alpha: i8,
-    beta: i8,
-) -> i8 {
+fn alpha_beta_rec(player: bool, state: &Configuration, depth: u8, alpha: i8, beta: i8) -> i8 {
     if depth == 0 {
-        return state.value() 
+        return state.value()
+            * if state.current_player == player {
+                1
+            } else {
+                -1
+            };
     }
 
     let ok_moves = state.movements().filter(|mov| state.check_move(mov));
 
     let mut check_moves_size = ok_moves.peekable();
 
-    // If no move is doable, return the value (right now the game can't end)
+    // If no move is doable, return the value
     if check_moves_size.peek() == None {
         return state.value()
+            * if state.current_player == player {
+                1
+            } else {
+                -1
+            };
     }
 
-    if state.current_player == player {
+    if state.current_player != player {
         check_moves_size
-            .try_fold((alpha, beta, i8::MAX), move |(alpha, beta, v), mov| {
+            .try_fold((alpha, beta, i8::MAX), |(alpha, beta, v), mov| {
                 let resval = alpha_beta_rec(player, &state.play(&mov), depth - 1, alpha, beta);
                 let mut new_v = v;
                 let mut new_beta = beta;
@@ -46,7 +52,7 @@ fn alpha_beta_rec(
             .2
     } else {
         check_moves_size
-            .try_fold((alpha, beta, i8::MAX), move |(alpha, beta, v), mov| {
+            .try_fold((alpha, beta, i8::MAX), |(alpha, beta, v), mov| {
                 let resval = alpha_beta_rec(player, &state.play(&mov), depth - 1, alpha, beta);
                 let mut new_v = v;
                 let mut new_alpha = alpha;
@@ -72,7 +78,7 @@ fn alpha_beta_rec(
 /// This function is intended to be called from blobwar_iterative_deepening.
 pub fn alpha_beta_anytime(state: &Configuration) {
     let mut movement = AtomicMove::connect().expect("failed connecting to shmem");
-    for depth in 1..100 {
+    for depth in 2..100 {
         let chosen_movement = AlphaBeta(depth).compute_next_move(state);
         movement.store(chosen_movement);
     }
@@ -89,24 +95,23 @@ impl fmt::Display for AlphaBeta {
 
 impl Strategy for AlphaBeta {
     fn compute_next_move(&mut self, state: &Configuration) -> Option<Movement> {
-        state
-            .movements()
-            .filter(|mov| state.check_move(mov))
+        state.movements().filter(|mov| state.check_move(mov))
             .try_fold((i8::MIN, i8::MAX, i8::MAX, None), |(alpha, beta, v, _), mov| {
                 let resval = alpha_beta_rec(state.current_player, &state.play(&mov), self.0 - 1, alpha, beta);
                 let mut new_v = v;
-                let mut new_beta = beta;
-                if resval < v {
+                let mut new_alpha = alpha;
+                if resval > v {
                     new_v = resval
                 };
-                if new_v <= alpha {
+                if new_v >= beta {
                     return Err((alpha, beta, new_v, Some(mov)));
                 };
-                if new_v < beta {
-                    new_beta = new_v
+                if new_v > alpha {
+                    new_alpha = new_v
                 };
-                Ok((alpha, new_beta, new_v, Some(mov)))
+                Ok((new_alpha, beta, new_v, Some(mov)))
             })
-            .unwrap_or_else(|(alpha, beta, v, mov)| (alpha, beta, v, mov)).3
+            .unwrap_or_else(|(alpha, beta, v, mov)| (alpha, beta, v, mov))
+            .3
     }
 }
