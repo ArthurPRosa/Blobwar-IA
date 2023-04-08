@@ -40,7 +40,7 @@ fn alpha_beta_rec(
             None,
         ));
     }
-    let (_, _, val, mov) = if state.current_player != player {
+    let (_, _, val, mov) = if state.current_player == player {
         check_moves_size
             .try_fold((alpha, beta, i8::MAX, None), |(alpha, beta, v, old_mov), new_mov| {
                 //We use try_fold to be able to break from the fold, and we simply return the result from the last Ok or first Err with the identity in unwrap_or_else
@@ -51,12 +51,13 @@ fn alpha_beta_rec(
                     if new_v < alpha {
                         return Err((alpha, beta, new_v, Some(new_mov)));
                     };
+                    let (new_beta, best_mov) =
                     if new_v < beta {
                         (new_v, Some(new_mov))
                     } else {
-                        (alpha, old_mov)
+                        (beta, old_mov)
                     };
-                    Ok((alpha, beta.min(new_v), new_v, Some(new_mov)))
+                    Ok((alpha, new_beta, new_v, best_mov))
                 } else {
                     Ok((alpha, beta, v, None))
                 }
