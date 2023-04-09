@@ -1,5 +1,4 @@
 //! Dumb greedy algorithm.
-use itertools::Itertools;
 
 use super::Strategy;
 use crate::configuration::{Configuration, Movement};

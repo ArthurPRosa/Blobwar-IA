@@ -51,12 +51,14 @@ fn alpha_beta_rec(
                     if new_v < alpha {
                         return Err((alpha, beta, new_v, Some(new_mov)));
                     };
+
                     let (new_beta, best_mov) =
                     if new_v < beta {
                         (new_v, Some(new_mov))
                     } else {
                         (beta, old_mov)
                     };
+                    
                     Ok((alpha, new_beta, new_v, best_mov))
                 } else {
                     Ok((alpha, beta, v, None))
@@ -74,12 +76,14 @@ fn alpha_beta_rec(
                     if new_v > beta {
                         return Err((alpha, beta, new_v, Some(new_mov)));
                     }
+
                     let (new_alpha, best_mov) =
                     if new_v > alpha {
                         (new_v, Some(new_mov))
                     } else {
                         (alpha, old_mov)
                     };
+
                     Ok((new_alpha, beta, new_v, best_mov))
                 } else {
                     Ok((alpha, beta, v, None))
