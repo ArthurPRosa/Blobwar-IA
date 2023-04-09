@@ -1,12 +1,31 @@
 #[macro_use]
 extern crate bencher;
 use bencher::Bencher;
-use blobwar::{configuration::Configuration, strategy::{MinMax, Greedy}};
+use blobwar::{
+    configuration::*,
+    strategy::{Greedy, MinMax, Strategy},
+};
 
 fn bench_MinMax(b: &mut Bencher) {
     let board = Default::default();
     let mut game = Configuration::new(&board);
-    b.iter(|| game.battle(Greedy(), Greedy()));
+    let mut player_one = MinMax(2);
+    let mut player_two = MinMax(2);
+    b.iter(|| {
+        while !game.game_over() {
+            let play_attempt = if game.current_player {
+                player_two.compute_next_move(&game)
+            } else {
+                player_one.compute_next_move(&game)
+            };
+            if let Some(ref next_move) = play_attempt {
+                assert!(&game.check_move(next_move));
+                game.apply_movement(next_move);
+            } else {
+                game.current_player = !game.current_player;
+            }
+        }
+    });
 }
 
 benchmark_group!(benches, bench_MinMax);

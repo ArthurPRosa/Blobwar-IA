@@ -165,7 +165,7 @@ impl<'a> Configuration<'a> {
     }
 
     /// Return true if no empty space remains or someone died.
-    fn game_over(&self) -> bool {
+    pub fn game_over(&self) -> bool {
         self.blobs[0].is_empty()
             || self.blobs[1].is_empty()
             || self.blobs[0]
