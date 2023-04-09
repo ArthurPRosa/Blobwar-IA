@@ -3,14 +3,14 @@ extern crate bencher;
 use bencher::Bencher;
 use blobwar::{
     configuration::*,
-    strategy::{Greedy, MinMax, Strategy},
+    strategy::{Greedy, MinMax, AlphaBeta, Strategy},
 };
 
 fn bench_MinMax(b: &mut Bencher) {
     let board = Default::default();
     let mut game = Configuration::new(&board);
-    let mut player_one = MinMax(2);
-    let mut player_two = MinMax(2);
+    let mut player_one = AlphaBeta(3); // replace the strategy if you want.
+    let mut player_two = AlphaBeta(3);
     b.iter(|| {
         while !game.game_over() {
             let play_attempt = if game.current_player {
